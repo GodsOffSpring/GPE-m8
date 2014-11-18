@@ -140,6 +140,12 @@ config CPU_FREQ_DEFAULT_GOV_WHEATLEY
 	select CPU_FREQ_GOV_PERFORMANCE
 	---help---
 	  Use the CPUFreq governor 'wheatley' as default.
+	  
+config CPU_FREQ_DEFAULT_GOV_RAGINGVENTURES
+	bool "ragingventures"
+	select CPU_FREQ_GOV_RAGINGVENTURES
+	help
+	  Use the CPUFreq governor 'RagingVentures' as default.
 
 config CPU_FREQ_DEFAULT_GOV_OPTIMAX
 	bool "optimax"
@@ -282,6 +288,21 @@ config CPU_FREQ_GOV_INTELLIACTIVE
 config CPU_FREQ_GOV_WHEATLEY
 	tristate "'wheatley' cpufreq governor"
 	depends on CPU_FREQ
+	
+config CPU_FREQ_GOV_RAGINGVENTURES
+	tristate "'ragingventures' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  'RAGINGVENTURES' - This driver adds a cpufreq policy governor 
+	  much along the lines of ondemand but tries to keep to low 
+	  frequencies without hurting performance for workloads that need it. 
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_interactive.
+
+	  For details, take a look at linux/Documentation/cpu-freq.
+
+	  If in doubt, say N.
 
 config CPU_FREQ_GOV_OPTIMAX
 	tristate "'optimax' cpufreq policy governor"

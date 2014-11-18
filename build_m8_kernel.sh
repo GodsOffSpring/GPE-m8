@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Path to build your kernel
-  k=~/kernel/m8444vzw
+  k=~/Android/Builds/GodsOffSpring/GPE-m8
 # Directory for the any kernel updater
   t=$k/packages
 # Date to add to zip
@@ -13,7 +13,7 @@
 #     make clean
 
 # Setup the build
- cd $k/arch/arm/configs/BBKconfigs
+ cd $k/arch/arm/configs/GOconfigs
     for c in *
       do
         cd $k
@@ -27,7 +27,8 @@
   m=$k/out/$c/system/lib/modules
   z=$c-$today
 
-TOOLCHAIN=/home/forrest/kernel/linaro-4.9.2/bin/arm-cortex_a15-linux-gnueabihf-
+TOOLCHAIN=/opt/android-ndk-r10c/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
+#TOOLCHAIN=/home/topaz/Android/Builds/GodsOffSpring/LINARO/bin/arm-linux-androideabi-
 export ARCH=arm
 export SUBARCH=arm
 
