@@ -27,6 +27,7 @@
 #define SYNAPTICS_FW_NOCAL_PACKRAT 1293981
 #define SYNAPTICS_FW_2IN1_PACKRAT 1396865
 #define SYNAPTICS_FW_35_COVER 1661078
+#define SYNAPTICS_FW_3508_COVER 1741220
 
 #define SYN_CFG_BLK_UNIT	(16)
 #define SYN_CONFIG_SIZE 	(32 * SYN_CFG_BLK_UNIT)
@@ -55,10 +56,6 @@
 
 #define SENSOR_ID_CHECKING_EN	1 << 16
 
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-extern unsigned int phone_call_stat;
-#endif
-
 enum {
 	SYNAPTICS_FLIP_X = 1UL << 0,
 	SYNAPTICS_FLIP_Y = 1UL << 1,
@@ -84,6 +81,7 @@ struct synaptics_virtual_key {
 struct synaptics_config {
 	uint8_t default_cfg;
 	uint32_t sensor_id;
+	bool     mfgconfig;
 	uint32_t pr_number;
 	uint16_t length;
 	uint32_t pl_x_min;

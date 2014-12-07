@@ -42,6 +42,7 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 
+#include <linux/elevator.h>
 #include <asm/uaccess.h>
 
 #include "queue.h"
@@ -1434,25 +1435,24 @@ out:
 static int mmc_blk_issue_flush(struct mmc_queue *mq, struct request *req)
 {
 	struct mmc_blk_data *md = mq->data;
-	struct request_queue *q = mq->queue;
 	struct mmc_card *card = md->queue.card;
 	int ret = 0;
 
 	ret = mmc_flush_cache(card);
-	if (ret == -ETIMEDOUT) {
-		pr_info("%s: requeue flush request after timeout", __func__);
+	if (ret) {
+#if 0
 		spin_lock_irq(q->queue_lock);
 		blk_requeue_request(q, req);
 		spin_unlock_irq(q->queue_lock);
-		ret = 0;
-		goto exit;
-	} else if (ret) {
-		pr_err("%s: notify flush error to upper layers", __func__);
+#endif
+		mmc_reinit_card(card->host);
+		pr_err("%s: %s: notify flush error to upper layers",
+				req->rq_disk->disk_name, __func__);
 		ret = -EIO;
 	}
 
 	blk_end_request_all(req, ret);
-exit:
+
 	return ret ? 0 : 1;
 }
 
@@ -1534,7 +1534,24 @@ static int mmc_blk_err_check(struct mmc_card *card,
 					" %s %s\n", mmc_hostname(card->host),
 					req->rq_disk->disk_name, __func__);
 
-				return MMC_BLK_CMD_ERR;
+				err = send_stop(card, &status);
+				if (err) {
+					pr_err("%s: error %d sending stop command\n",
+							req->rq_disk->disk_name, err);
+					return MMC_BLK_CMD_ERR;
+				}
+
+				err = get_card_status(card, &status, 5);
+				if (err) {
+					pr_err("%s: error %d requesting status\n",
+							req->rq_disk->disk_name, err);
+					return MMC_BLK_CMD_ERR;
+				}
+				if (!(status & R1_READY_FOR_DATA) ||
+				    (R1_CURRENT_STATE(status) == R1_STATE_PRG))
+					return MMC_BLK_CMD_ERR;
+				else
+					break;
 			}
 		} while (!(status & R1_READY_FOR_DATA) ||
 			 (R1_CURRENT_STATE(status) == R1_STATE_PRG));
@@ -2408,15 +2425,6 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 			}
 			break;
 		case MMC_BLK_CMD_ERR:
-			ret = mmc_blk_cmd_err(md, card, brq, req, ret);
-			if (!mmc_blk_reset(md, card->host, type)) {
-				if (!ret) {
-					BUG_ON(card->host->areq);
-					goto start_new_req;
-				}
-				break;
-			}
-			goto cmd_abort;
 		case MMC_BLK_RETRY:
 		case MMC_BLK_ABORT:
 		case MMC_BLK_DATA_ERR:
@@ -2446,6 +2454,16 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 						mq_rq->packed_cmd != MMC_PACKED_NONE)
 					goto cmd_abort;
 				
+			} else if (status == MMC_BLK_CMD_ERR) {
+				ret = mmc_blk_cmd_err(md, card, brq, req, ret);
+				if (!mmc_blk_reset(md, card->host, type)) {
+					if (!ret) {
+						BUG_ON(card->host->areq);
+						goto start_new_req;
+					}
+					break;
+				}
+				goto cmd_abort;
 			} else {
 				if (!mmc_blk_reset(md, card->host, type))
 					break;
@@ -3304,6 +3322,16 @@ static int mmc_blk_probe(struct mmc_card *card)
 
 	mmc_set_drvdata(card, md);
 	mmc_fixup_device(card, blk_fixups);
+#ifdef CONFIG_IOSCHED_CFQ
+	if(card->quirks & MMC_QUIRK_URGENT_REQUEST_DISABLE) {
+		int ret;
+		if (md->queue.queue && md->queue.queue->elevator) {
+			ret = elevator_change(md->queue.queue, "cfq");
+			pr_info("%s: change scheduler to cfq, ret %d\n",
+				mmc_hostname(card->host), ret);
+		}
+	}
+#endif
 
 	
 	mmc_set_bus_resume_policy(card->host, 1);

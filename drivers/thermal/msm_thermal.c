@@ -36,6 +36,7 @@
 #include <mach/rpm-regulator-smd.h>
 #include <linux/regulator/consumer.h>
 #include <linux/msm_thermal_ioctl.h>
+#include <mach/devices_dtb.h>
 
 #define MAX_CURRENT_UA 1000000
 #define MAX_RAILS 5
@@ -953,7 +954,7 @@ static __ref int do_hotplug(void *data)
 		return -EINVAL;
 
 	while (!kthread_should_stop()) {
-		wait_for_completion_interruptible(&hotplug_notify_complete);
+		wait_for_completion(&hotplug_notify_complete);
 		INIT_COMPLETION(hotplug_notify_complete);
 		mask = 0;
 
@@ -1373,7 +1374,7 @@ static __ref int do_freq_mitigation(void *data)
 	uint32_t cpu = 0, max_freq_req = 0, min_freq_req = 0;
 
 	while (!kthread_should_stop()) {
-		wait_for_completion_interruptible(&freq_mitigation_complete);
+		wait_for_completion(&freq_mitigation_complete);
 		INIT_COMPLETION(freq_mitigation_complete);
 
 		get_online_cpus();
@@ -2807,6 +2808,14 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 
 	key = "qcom,freq-control-mask";
 	ret = of_property_read_u32(node, key, &data.bootup_freq_control_mask);
+
+#if defined(CONFIG_MACH_EYE_UL)
+	if(get_kernel_flag() & KERNEL_FLAG_KEEP_CHARG_ON) {
+		data.poll_ms = 100;
+		data.bootup_freq_step = 4;
+		printk("[Thermal-Driver]Polling time changed to:%dms, bootup_freq_step changed to:%d \n", data.poll_ms, data.bootup_freq_step);
+	}
+#endif
 
 	ret = probe_cc(node, &data, pdev);
 

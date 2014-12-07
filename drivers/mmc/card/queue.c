@@ -269,6 +269,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 		return -ENOMEM;
 
 	if ((host->caps2 & MMC_CAP2_STOP_REQUEST) &&
+			((card->quirks & MMC_QUIRK_URGENT_REQUEST_DISABLE) == 0) &&
 			host->ops->stop_request &&
 			mq->card->ext_csd.hpi_en)
 		blk_urgent_request(mq->queue, mmc_urgent_request);

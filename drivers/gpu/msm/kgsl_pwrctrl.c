@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,9 +39,6 @@ extern void set_gpu_clk(unsigned int);
 #define INIT_UDELAY		200
 #define MAX_UDELAY		2000
 
-//gboost
-int graphics_boost = 4;
-
 struct clk_pair {
 	const char *name;
 	uint map;
@@ -74,6 +71,8 @@ struct clk_pair clks[KGSL_MAX_CLKS] = {
 	},
 };
 
+static void kgsl_pwrctrl_clk(struct kgsl_device *device, int state,
+					int requested_state);
 static void kgsl_pwrctrl_axi(struct kgsl_device *device, int state);
 static void kgsl_pwrctrl_pwrrail(struct kgsl_device *device, int state);
 
@@ -179,9 +178,6 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 
 
 	trace_kgsl_pwrlevel(device, pwr->active_pwrlevel, pwrlevel->gpu_freq);
-
-//gboost
-        graphics_boost = pwr->active_pwrlevel;
 }
 
 EXPORT_SYMBOL(kgsl_pwrctrl_pwrlevel_change);
@@ -329,18 +325,6 @@ static int kgsl_pwrctrl_min_pwrlevel_show(struct device *dev,
 		return 0;
 	pwr = &device->pwrctrl;
 	return snprintf(buf, PAGE_SIZE, "%d\n", pwr->min_pwrlevel);
-}
-
-static int kgsl_pwrctrl_active_pwrlevel_show(struct device *dev,
-                                        struct device_attribute *attr,
-                                        char *buf)
-{
-	struct kgsl_device *device = kgsl_device_from_dev(dev);
-	struct kgsl_pwrctrl *pwr;
-	if (device == NULL)
-		return 0;
-	pwr = &device->pwrctrl;
-	return snprintf(buf, PAGE_SIZE, "%d\n", pwr->active_pwrlevel);
 }
 
 static int kgsl_pwrctrl_num_pwrlevels_show(struct device *dev,
@@ -760,9 +744,6 @@ DEVICE_ATTR(max_pwrlevel, 0644,
 DEVICE_ATTR(min_pwrlevel, 0644,
 	kgsl_pwrctrl_min_pwrlevel_show,
 	kgsl_pwrctrl_min_pwrlevel_store);
-DEVICE_ATTR(active_pwrlevel, 0444,
-	kgsl_pwrctrl_active_pwrlevel_show,
-	NULL);
 DEVICE_ATTR(thermal_pwrlevel, 0644,
 	kgsl_pwrctrl_thermal_pwrlevel_show,
 	kgsl_pwrctrl_thermal_pwrlevel_store);
@@ -797,7 +778,6 @@ static const struct device_attribute *pwrctrl_attr_list[] = {
 	&dev_attr_gpu_available_frequencies,
 	&dev_attr_max_pwrlevel,
 	&dev_attr_min_pwrlevel,
-	&dev_attr_active_pwrlevel,
 	&dev_attr_thermal_pwrlevel,
 	&dev_attr_num_pwrlevels,
 	&dev_attr_pmqos_latency,
@@ -1366,6 +1346,7 @@ _slumber(struct kgsl_device *device)
 		del_timer_sync(&device->idle_timer);
 		
 		kgsl_pwrctrl_enable(device);
+		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_ON);
 		device->ftbl->suspend_context(device);
 		device->ftbl->stop(device);
 		_sleep_accounting(device);

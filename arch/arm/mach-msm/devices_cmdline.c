@@ -3,9 +3,6 @@
 #include <mach/devices_dtb.h>
 #include <linux/module.h>
 
-#if defined(CONFIG_LCD_KCAL)
-#include <mach/htc_lcd_kcal.h>
-#endif
 #define RESET_MSG_LENGTH 512
 static unsigned char google_boot_reason[RESET_MSG_LENGTH];
 int __init google_boot_reason_init(char *s)
@@ -110,25 +107,6 @@ char *board_mid(void)
 	return android_mid;
 }
 EXPORT_SYMBOL(board_mid);
-
-static int android_rom_type;
-static int __init board_rom_type_setup(char *rom_type)
-{
-	pr_info("%s: rom type %s\r\n", __func__, rom_type);
-	if (!strcmp(rom_type, "NORMAL"))
-		android_rom_type = 0;
-	else if (!strcmp(rom_type, "STOCKUI"))
-		android_rom_type = 1;
-
-	return 1;
-}
-__setup("androidboot.rom_type=", board_rom_type_setup);
-
-int board_rom_type(void)
-{
-	return android_rom_type;
-}
-EXPORT_SYMBOL(board_rom_type);
 
 static int mfg_mode;
 static int fullramdump_flag;
@@ -240,33 +218,6 @@ static int __init board_bootloader_setup(char *str)
 	return 1;
 }
 __setup("androidboot.bootloader=", board_bootloader_setup);
-
-#if defined(CONFIG_LCD_KCAL)
-int g_kcal_r = 255;
-int g_kcal_g = 255;
-int g_kcal_b = 255;
-
-extern int kcal_set_values(int kcal_r, int kcal_g, int kcal_b);
-static int __init display_kcal_setup(char *kcal)
-{
-	char vaild_k = 0;
-	int kcal_r = 255;
-	int kcal_g = 255;
-	int kcal_b = 255;
-
-	sscanf(kcal, "%d|%d|%d|%c", &kcal_r, &kcal_g, &kcal_b, &vaild_k );
-	pr_info("kcal is %d|%d|%d|%c\n", kcal_r, kcal_g, kcal_b, vaild_k);
-
-	if (vaild_k != 'K') {
-		pr_info("kcal not calibrated yet : %d\n", vaild_k);
-		kcal_r = kcal_g = kcal_b = 255;
-	}
-
-	kcal_set_values(kcal_r, kcal_g, kcal_b);
-	return 1;
-}
-__setup("htc.kcal=", display_kcal_setup);
-#endif
 
 int board_build_flag(void)
 {

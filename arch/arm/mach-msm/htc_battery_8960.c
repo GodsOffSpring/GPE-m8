@@ -1872,7 +1872,8 @@ static void batt_level_adjust(unsigned long time_since_last_update_ms)
 		if (is_voltage_critical_low(htc_batt_info.rep.batt_vol)) {
 			critical_low_enter = 1;
 			
-			if (htc_batt_info.decreased_batt_level_check)
+			if (htc_batt_info.decreased_batt_level_check &&
+					htc_batt_info.rep.batt_temp > 0)
 				batt_check_critical_low_level(&dec_level,
 					htc_batt_info.rep.batt_current);
 			else

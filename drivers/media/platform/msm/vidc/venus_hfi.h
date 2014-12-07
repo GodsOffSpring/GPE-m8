@@ -150,6 +150,7 @@ struct hal_data {
 };
 
 enum vidc_clocks {
+	VCODEC_NONE,
 	VCODEC_CLK,
 	VCODEC_AHB_CLK,
 	VCODEC_AXI_CLK,

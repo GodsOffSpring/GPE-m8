@@ -2059,7 +2059,11 @@ static int tapan_codec_enable_lineout(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
 		dev_dbg(codec->dev, "%s: sleeping 3 ms after %s PA turn on\n",
 				__func__, w->name);
+#if defined(CONFIG_MACH_DUMMY) || defined(CONFIG_MACH_DUMMY)
+		usleep_range(5000, 5010);
+#else
 		usleep_range(3000, 3010);
+#endif
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		wcd9xxx_clsh_fsm(codec, &tapan->clsh_d,

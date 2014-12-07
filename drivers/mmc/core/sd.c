@@ -342,6 +342,8 @@ int mmc_sd_switch_hs(struct mmc_card *card)
 	int err;
 	u8 *status;
 
+	card->sw_caps.uhs_max_dtr = 0;
+
 	if (card->scr.sda_vsn < SCR_SPEC_VER_1)
 		return 0;
 
@@ -1065,7 +1067,7 @@ static int mmc_sd_suspend(struct mmc_host *host)
 
 static int mmc_sd_resume(struct mmc_host *host)
 {
-	int err = 0;
+	int err;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	int retries;
 	int delayTime;

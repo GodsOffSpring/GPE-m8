@@ -43,6 +43,7 @@ enum {
 #define HAVE_WCNSS_RX_BUFF_COUNT 1
 #define WLAN_MAC_ADDR_SIZE (6)
 
+void wcnss_get_monotonic_boottime(struct timespec *ts);
 struct device *wcnss_wlan_get_device(void);
 struct resource *wcnss_wlan_get_memory_map(struct device *dev);
 int wcnss_wlan_get_dxe_tx_irq(struct device *dev);
@@ -96,8 +97,7 @@ int wcnss_get_wlan_unsafe_channel(
 				u16 *ch_count);
 #define wcnss_wlan_get_drvdata(dev) dev_get_drvdata(dev)
 #define wcnss_wlan_set_drvdata(dev, data) dev_set_drvdata((dev), (data))
-/* WLAN driver uses these names */
 #define req_riva_power_on_lock(name) wcnss_req_power_on_lock(name)
 #define free_riva_power_on_lock(name) wcnss_free_power_on_lock(name)
 
-#endif /* _WCNSS_WLAN_H_ */
+#endif 

@@ -574,7 +574,7 @@ void extract_dci_pkt_rsp(unsigned char *buf, int len, int data_source,
 
 	
 	delete_flag = diag_dci_remove_req_entry(temp, rsp_len, req_entry);
-	if (delete_flag < 0)
+	if ((delete_flag != 0) && (delete_flag != 1))
 		return;
 
 	entry = __diag_dci_get_client_entry(curr_client_pid);

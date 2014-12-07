@@ -1127,6 +1127,13 @@ static struct platform_driver wcnss_ctrl_driver = {
 	.remove	= __devexit_p(wcnss_ctrl_remove),
 };
 
+void wcnss_get_monotonic_boottime(struct timespec *ts)
+{
+	get_monotonic_boottime(ts);
+}
+EXPORT_SYMBOL(wcnss_get_monotonic_boottime);
+
+
 struct device *wcnss_wlan_get_device(void)
 {
 	if (penv && penv->pdev && penv->smd_channel_ready)
@@ -1212,6 +1219,12 @@ void wcnss_wlan_unregister_pm_ops(struct device *dev,
 				const struct dev_pm_ops *pm_ops)
 {
 	if (penv && dev && (dev == &penv->pdev->dev) && pm_ops) {
+		if (penv->pm_ops == NULL) {
+			pr_err("%s: pm_ops is already unregistered.\n",
+				 __func__);
+			return;
+		}
+
 		if (pm_ops->suspend != penv->pm_ops->suspend ||
 				pm_ops->resume != penv->pm_ops->resume)
 			pr_err("PM APIs dont match with registered APIs\n");

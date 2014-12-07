@@ -50,6 +50,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/mmc.h>
 #include <trace/events/mmcio.h>
+#include <trace/events/f2fs.h>
 
 static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
 
@@ -103,7 +104,7 @@ enum {
     PP_PERFORMANCE = 4,
 };
 
-bool use_spi_crc = 0;
+bool use_spi_crc = 1;
 module_param(use_spi_crc, bool, 0);
 
 #ifdef CONFIG_MMC_UNSAFE_RESUME
@@ -889,8 +890,10 @@ static bool mmc_should_stop_curr_req(struct mmc_host *host)
 	    (host->areq->cmd_flags & REQ_FUA))
 		return false;
 
+	mmc_host_clk_hold(host);
 	remainder = (host->ops->get_xfer_remain) ?
 		host->ops->get_xfer_remain(host) : -1;
+	mmc_host_clk_release(host);
 	return (remainder > 0);
 }
 
@@ -906,6 +909,7 @@ static int mmc_stop_request(struct mmc_host *host)
 				mmc_hostname(host));
 		return -ENOTSUPP;
 	}
+	mmc_host_clk_hold(host);
 	err = host->ops->stop_request(host);
 	if (err) {
 		pr_err("%s: Call to host->ops->stop_request() failed (%d)\n",
@@ -940,6 +944,7 @@ static int mmc_stop_request(struct mmc_host *host)
 		goto out;
 	}
 out:
+	mmc_host_clk_release(host);
 	return err;
 }
 
@@ -3285,7 +3290,7 @@ EXPORT_SYMBOL(mmc_card_can_sleep);
 int mmc_flush_cache(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
-	int err = 0, rc;
+	int err = 0;
 
 	if (!(host->caps2 & MMC_CAP2_CACHE_CTRL) ||
 	     (card->quirks & MMC_QUIRK_CACHE_DISABLE))
@@ -3294,17 +3299,35 @@ int mmc_flush_cache(struct mmc_card *card)
 	if (mmc_card_mmc(card) &&
 			(card->ext_csd.cache_size > 0) &&
 			(card->ext_csd.cache_ctrl & 1)) {
-		err = mmc_switch_ignore_timeout(card, EXT_CSD_CMD_SET_NORMAL,
-						EXT_CSD_FLUSH_CACHE, 1,
-						MMC_FLUSH_REQ_TIMEOUT_MS);
-		if (err == -ETIMEDOUT) {
-			pr_err("%s: cache flush timeout\n",
-					mmc_hostname(card->host));
-			rc = mmc_interrupt_hpi(card);
-			if (rc)
-				pr_err("%s: mmc_interrupt_hpi() failed (%d)\n",
-						mmc_hostname(host), rc);
-		} else if (err) {
+		int retries = 0;
+		while (retries++ < 3) {
+			u32 status;
+			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+					EXT_CSD_FLUSH_CACHE, 1, 0);
+			if (err) {
+				err = mmc_send_status(card, &status);
+				if (err)
+					break;
+
+				switch (R1_CURRENT_STATE(status)) {
+				case R1_STATE_IDLE:
+				case R1_STATE_READY:
+				case R1_STATE_STBY:
+				case R1_STATE_TRAN:
+					err = 0;
+					break;
+				case R1_STATE_PRG:
+				default:
+					err = -1;
+					break;
+				}
+			}
+
+			if (!err)
+				break;
+		}
+
+		if (err) {
 			pr_err("%s: cache flush error %d\n",
 					mmc_hostname(card->host), err);
 		}

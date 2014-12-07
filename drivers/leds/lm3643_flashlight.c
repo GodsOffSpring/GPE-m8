@@ -514,7 +514,7 @@ static void fl_lcdev_brightness_set(struct led_classdev *led_cdev,
 		
 		
 		case FL_MODE_TORCH_LEVEL_0:
-			lm3643_flashlight_torch(21,27);
+			lm3643_flashlight_torch(27,17);
 		break;
 		
 		default:

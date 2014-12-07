@@ -26,16 +26,11 @@
 #include <mach/debug_display.h>
 #include <linux/msm_mdp.h>
 
-#include <linux/moduleparam.h>
-
 #define DT_CMD_HDR 6
 #define WLED_MAX_LEVEL	4095
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 DEFINE_LED_TRIGGER(bl_led_i2c_trigger);
-
-bool backlight_dimmer = false;
-module_param(backlight_dimmer, bool, 0755);
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -157,7 +152,7 @@ static unsigned char shrink_pwm(int val, int pwm_min, int pwm_default, int pwm_m
         } else if (val > BRI_SETTING_MAX)
                 shrink_br = pwm_max;
 
-        //PR_DISP_INFO("brightness orig=%d, transformed=%d\n", val, shrink_br);
+        PR_DISP_INFO("brightness orig=%d, transformed=%d\n", val, shrink_br);
 
         return shrink_br;
 }
@@ -211,15 +206,10 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	pr_debug("%s: level=%d\n", __func__, level);
 
-	if (!pinfo->act_brt) {
-		if (backlight_dimmer) {
-			led_pwm1[1] = (unsigned char)shrink_pwm(level, 1, 25, 125);
-		} else {
-			led_pwm1[1] = (unsigned char)shrink_pwm(level, ctrl->pwm_min, ctrl->pwm_default, ctrl->pwm_max);
-		}
-	} else {
+	if (!pinfo->act_brt)
+		led_pwm1[1] = (unsigned char)shrink_pwm(level, ctrl->pwm_min, ctrl->pwm_default, ctrl->pwm_max);
+	else
 		led_pwm1[1] = (unsigned char)linear_pwm(level, pinfo->max_brt, pinfo->bl_max);
-	}
 
 	led_pwm1[2] = led_pwm1[1];
 	memset(&cmdreq, 0, sizeof(cmdreq));
@@ -1202,6 +1192,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "htc,mdp-pcc-b", &tmp);
 	pinfo->pcc_b = (!rc ? tmp : 0);
+
+	pinfo->skip_frame = of_property_read_bool(np, "htc,skip-frame");
 
 	rc = of_property_read_u32(np, "htc,mdss-max-brt-level", &tmp);
 	pinfo->act_max_brt = (!rc ? tmp : MDSS_MAX_BL_BRIGHTNESS);

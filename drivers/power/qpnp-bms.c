@@ -1352,13 +1352,11 @@ static int get_rbatt(struct qpnp_bms_chip *chip,
 		return rbatt_mohm;
 	}
 	
-#ifdef CONFIG_ARCH_DUMMY
 	
 	if (soc_rbatt_mohm > 100)
 		scalefactor = interpolate_scalingfactor(chip->rbatt_sf_lut,
 							batt_temp, 100);
 	else
-#endif
 	scalefactor = interpolate_scalingfactor(chip->rbatt_sf_lut,
 						batt_temp, soc_rbatt_mohm);
 	bms_dbg.rbatt_sf = scalefactor;
@@ -1839,7 +1837,7 @@ static int get_prop_bms_current_now(struct qpnp_bms_chip *chip)
 
 static int get_prop_bms_charge_counter(struct qpnp_bms_chip *chip)
 {
-	int64_t cc_raw = 0;
+	int64_t cc_raw;
 
 	mutex_lock(&chip->bms_output_lock);
 	lock_output_data(chip);
@@ -1852,7 +1850,7 @@ static int get_prop_bms_charge_counter(struct qpnp_bms_chip *chip)
 
 static int get_prop_bms_charge_counter_shadow(struct qpnp_bms_chip *chip)
 {
-	int64_t cc_raw = 0;
+	int64_t cc_raw;
 
 	mutex_lock(&chip->bms_output_lock);
 	lock_output_data(chip);
@@ -2102,7 +2100,7 @@ static int report_voltage_based_soc(struct qpnp_bms_chip *chip)
 #define REPORT_SOC_WAIT_MS		10000
 static int report_cc_based_soc(struct qpnp_bms_chip *chip)
 {
-	int soc, soc_change = 0;
+	int soc, soc_change;
 	int time_since_last_change_sec, charge_time_sec = 0;
 	unsigned long last_change_sec;
 	struct timespec now;
@@ -2191,10 +2189,10 @@ static int report_cc_based_soc(struct qpnp_bms_chip *chip)
 	if (chip->last_soc != soc && !chip->last_soc_unbound)
 		chip->last_soc_change_sec = last_change_sec;
 
-	/*pr_info("last_soc = %d, calculated_soc = %d, soc = %d, time since last change = %d,"
+	pr_info("last_soc = %d, calculated_soc = %d, soc = %d, time since last change = %d,"
 			"ori_soc_change = %d, soc_change = %d\n",
 			chip->last_soc, chip->calculated_soc,
-			soc, time_since_last_change_sec, bms_dbg.ori_soc_change, soc_change);*/
+			soc, time_since_last_change_sec, bms_dbg.ori_soc_change, soc_change);
 
 	chip->last_soc = bound_soc(soc);
 	backup_soc_and_iavg(chip, batt_temp, chip->last_soc);
@@ -2476,7 +2474,7 @@ out:
 #endif 
 static int clamp_soc_based_on_voltage(struct qpnp_bms_chip *chip, int soc)
 {
-	int rc, vbat_uv = 0, batt_temp;
+	int rc, vbat_uv, batt_temp;
 
 	rc = get_battery_voltage(chip, &vbat_uv);
 	if (rc < 0) {
@@ -2640,7 +2638,7 @@ static int calculate_state_of_charge(struct qpnp_bms_chip *chip,
 					int batt_temp)
 {
 	struct soc_params params;
-	int soc = 0, previous_soc, shutdown_soc, new_calculated_soc;
+	int soc, previous_soc, shutdown_soc, new_calculated_soc;
 	int remaining_usable_charge_uah;
 
 	calculate_soc_params(chip, raw, &params, batt_temp);
@@ -2727,7 +2725,7 @@ done_calculating:
 	} else {
 		report_state_of_charge(chip);
 	}
-	/*pr_info("FCC=%d,UC=%d,RC=%d,CC_uAh/ori=%d/%d,RUC=%d,SOC=%d,raw_soc=%d,"
+	pr_info("FCC=%d,UC=%d,RC=%d,CC_uAh/ori=%d/%d,RUC=%d,SOC=%d,raw_soc=%d,"
 		       "start_pc=%d,end_pc=%d,OCV_uV/ori=%d/%d,OCV_raw=%x,"
 		       "rbatt=%d,rbatt_sf=%d,batt_temp=%d,soc_rbatt=%d,"
 		       "ori_uuc_uah=%d,uuc_rbatt=%d,uuc_iavg_ma=%d,"
@@ -2747,7 +2745,7 @@ done_calculating:
 			bms_dbg.shutdown_soc, bms_dbg.time_last_change_s, bms_dbg.adjusted_soc,
 			chip->calculated_soc, raw->cc, raw->shdw_cc, chip->ocv_reading_at_100,
 			chip->cc_backup_uah, chip->ocv_backup_uv, consistent_flag, is_ocv_update_start,
-			htc_batt_bms_timer.no_ocv_update_period_ms);*/
+			htc_batt_bms_timer.no_ocv_update_period_ms);
 
 	if(Last_OCV_Raw == 0){
 		Last_OCV_Raw = raw->last_good_ocv_raw;
@@ -2773,7 +2771,7 @@ done_calculating:
 static int calculate_soc_from_voltage(struct qpnp_bms_chip *chip)
 {
 	int voltage_range_uv, voltage_remaining_uv, voltage_based_soc;
-	int rc, vbat_uv = 0;
+	int rc, vbat_uv;
 
 	rc = get_battery_voltage(chip, &vbat_uv);
 	if (rc < 0) {
@@ -3019,7 +3017,7 @@ static void configure_vbat_monitor_high(struct qpnp_bms_chip *chip)
 static void btm_notify_vbat(enum qpnp_tm_state state, void *ctx)
 {
 	struct qpnp_bms_chip *chip = ctx;
-	int vbat_uv = 0;
+	int vbat_uv;
 	struct qpnp_vadc_result result;
 	int rc;
 
@@ -4053,7 +4051,7 @@ static int dump_all(void)
 	if(BATT_LOG_BUF_LEN - len <= 1)
 		pr_warn("batt log length maybe out of buffer range!!!");
 
-	//pr_info("%s\n", batt_log_buf);
+	pr_info("%s\n", batt_log_buf);
 	return 0;
 }
 

@@ -99,7 +99,7 @@ module_param(DEBUG_FLAG_GEOMAGNETIC_ROTATION_VECTOR, int, 0600);
 static int DEBUG_FLAG_TIME = 10;
 module_param(DEBUG_FLAG_TIME, int, 0600);
 static int p_status = 9;
-struct vib_trigger *vib_trigger = NULL;
+static struct vib_trigger *vib_trigger = NULL;
 
 static void polling_do_work(struct work_struct *w);
 static DECLARE_DELAYED_WORK(polling_work, polling_do_work);
@@ -207,7 +207,7 @@ static int cwmcu_read_debug_status(u8 *status) {
 
 	int err = 0;
 	u8 data[1]={0};
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	err = CWMCU_i2c_read(mcu_data, CWSTM32_READ_Debug_Status, data, 1);
 	if (err != 0) {
 		E("[CWMCU] failed to enable dubug. num = %d", err);
@@ -274,7 +274,7 @@ static int cwmcu_dump_debug(void) {
 	u8 data[MAX_I2C_BUF_SIZE]={0};
 	int index = 0;
 	int i;
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	for (i = 0; i < MAX_DEBUG_BUF_SIZE / MAX_I2C_BUF_SIZE; i++) {
 		err = CWMCU_i2c_read(mcu_data, CWSTM32_READ_Dump_Debug_Buffer, data, MAX_I2C_BUF_SIZE);
 		if (err != 0) {
@@ -290,7 +290,7 @@ static int cwmcu_dump_debug(void) {
 
 static int cwmcu_write_reg(u8 reg, u8 val) {
 	int err = 0;
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	err = CWMCU_i2c_write(mcu_data, reg, &val, 1);
 	return err;
 }
@@ -301,18 +301,18 @@ static long cwmcu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	unsigned char reg_value[2];
 	long rc = 0;
 	u8 write_data = 0;
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	switch (cmd) {
 	case CWSTM32_WRITE_Switch_Debug:
 
-	       //D("[CWMCU] CWSTM32_WRITE_Switch_Debug \n");
+	       D("[CWMCU] CWSTM32_WRITE_Switch_Debug \n");
 	       rc = cwmcu_read_debug_status(&write_data);
 		if (rc != -1) {
 			if (copy_from_user(reg_value, argp, sizeof(reg_value))) {
 				pr_err("[CWMCU] CWSTM32_WRITE_Switch_Debug failed");
 				goto err1;
 			}
-			//pr_info("[CWMCU] %s: reg_value[1]=%2x, write_data=%2x\n", __func__, reg_value[1], write_data);
+			pr_info("[CWMCU] %s: reg_value[1]=%2x, write_data=%2x\n", __func__, reg_value[1], write_data);
 			if (reg_value[1] == 1) {
 				write_data |= (1L << 0); 
 			} else {
@@ -323,7 +323,7 @@ static long cwmcu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	err1:
 	       break;
 	case CWSTM32_READ_Dump_Debug:
-		//D("[CWMCU] CWSTM32_READ_Dump_Debug\n");
+		D("[CWMCU] CWSTM32_READ_Dump_Debug\n");
 
 		rc = cwmcu_dump_debug();
 		if (rc == 0) {
@@ -335,7 +335,7 @@ static long cwmcu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	err3:
 	       break;
 	case CWSTM32_READ_Dump_Call_Stack:
-		//D("[CWMCU] CWSTM32_READ_Dump_Call_Stack\n");
+		D("[CWMCU] CWSTM32_READ_Dump_Call_Stack\n");
 
 		rc = cwmcu_dump_call_stack(MAX_CALL_STACK_SIZE);
 		if (rc == 0) {
@@ -358,7 +358,7 @@ static long cwmcu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static int cwmcu_open(struct inode *inode, struct file *file)
 {
 	int rc = 0;
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	if (cwmcu_opened) {
 	      pr_info("%s: busy\n", __func__);
 	}
@@ -368,7 +368,7 @@ static int cwmcu_open(struct inode *inode, struct file *file)
 
 static int cwmcu_release(struct inode *inode, struct file *file)
 {
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	cwmcu_opened = 0;
 	return 0;
 }
@@ -928,100 +928,6 @@ static int get_proximity(struct device *dev, struct device_attribute *attr, char
 	return snprintf(buf, PAGE_SIZE, "%x %x \n",data[0],data2);
 }
 
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-extern int cam_switch;
-
-static int proximity_flag = 0;
-
-static void sensor_enable(int sensors_id, int enabled)
-{
-	u8 i;
-	u8 data;
-	u8 data8[8] = {0};
-	int retry = 0, rc = 0;
-
-	for (retry = 0; retry < ACTIVE_RETRY_TIMES; retry++) {
-		if (mcu_data->resume_done != 1)
-			I("%s: resume not completed, retry = %d\n", __func__, retry);
-		else
-			break;
-	}
-	if (retry >= ACTIVE_RETRY_TIMES) {
-		I("%s: resume not completed, retry = %d, retry fails!\n", __func__, retry);
-		return;
-	}
-
-	if (probe_i2c_fail) {
-		I("%s++: probe_i2c_fail retrun 0\n", __func__);
-		return;
-	}
-
-	if ((sensors_id == Proximity) && (enabled == 0)) {
-		rc = CWMCU_i2c_read(mcu_data, CW_I2C_REG_SENSORS_CALIBRATOR_DEBUG_PROXIMITY, data8, 8);
-		I("%s: AUtoK: Threshold = %d, SADC = %d, CompensationValue = %d\n", __func__, data8[5], data8[4], data8[6]);
-		I("%s: AutoK: QueueIsEmpty = %d, Queue = %d %d %d %d\n", __func__, data8[7], data8[0], data8[1], data8[2], data8[3]);
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-		proximity_flag = 0;
-#endif
-	}
-
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-	if ((sensors_id == Proximity) && (enabled == 1)) {
-		proximity_flag = 1;
-	}
-#endif
-
-	if (enabled == 1) {
-		mcu_data->filter_first_zeros[sensors_id] = 1;
-	}
-
-	mcu_data->enabled_list &= ~(1<<sensors_id);
-	mcu_data->enabled_list |= ((uint32_t)enabled)<<sensors_id;
-
-	i = sensors_id /8;
-	data = (u8)(mcu_data->enabled_list>>(i*8));
-
-	D("%s++: sensors_id = %d, enabled = %d\n", __func__, sensors_id, enabled);
-
-	CWMCU_i2c_write(mcu_data, CWSTM32_ENABLE_REG+i, &data,1);
-
-	if ((mcu_data->input != NULL) && (sensors_id == Proximity) && (enabled == 1)) {
-		input_report_abs(mcu_data->input, ABS_DISTANCE, -1);
-	}
-}
-
-void proximity_set(int enabled)
-{
-	if (enabled) {
-		sensor_enable(Proximity, enabled);
-		I("[WG] proximity sensor enabled\n");
-	} else if (!proximity_flag) {
-		sensor_enable(Proximity, enabled);
-		I("[WG] proximity sensor disabled\n");
-	} else {
-		I("[WG] proximity sensor enabled by system\n");
-	}
-}
-
-void camera_volume_button_disable(void)
-{
-	sensor_enable(Gesture_Motion_HIDI, 0);
-	sensor_enable(Gesture_Motion, 0);
-}
-
-int check_pocket(void)
-{
-	u8 data[10]={0};
-	int ret;
-
-	CWMCU_i2c_read(mcu_data, CWSTM32_READ_Proximity, data, 2);
-	I("[WG] check pocket: data0=%d data1=%d\n", data[0], data[1]);
-	ret = data[0];
-
-	return ret;
-}
-#endif
-
 static int get_proximity_polling(struct device *dev, struct device_attribute *attr, char *buf){
 	u8 data[3]={0};
 	uint16_t data2;
@@ -1085,9 +991,6 @@ static int CWMCU_i2c_write(struct CWMCU_data *sensor,
 	int dummy;
 	int retry = 0;
 	int i;
-
-	if (sensor == NULL)
-		return -1;
 
 	mc_power_controller(1);
 	#if USE_WAKE_MCU
@@ -1168,6 +1071,10 @@ static int CWMCU_set_sensor_kvalue(struct CWMCU_data *sensor)
         }
 
 	if(((sensor->als_kvalue & (0x6D << 24)) == (0x6D << 24)) && ((sensor->als_kvalue & (0xA5 << 16)) == (0xA5 << 16))){
+		u8 data[4] = {0};
+		u8 cmp_data[4] = {0};
+		int i, j;
+
 		CWMCU_i2c_write(sensor, CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,&ALS_goldl,1);
 		CWMCU_i2c_write(sensor, CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,&ALS_goldh,1);
 		ALS_datal = (sensor->als_kvalue)&0xFF;
@@ -1175,7 +1082,65 @@ static int CWMCU_set_sensor_kvalue(struct CWMCU_data *sensor)
 		ALS_datah = (sensor->als_kvalue >>  8)& 0xFF;
 		CWMCU_i2c_write(sensor, CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,&ALS_datah,1);
 		sensor->ls_calibrated = 1;
-		D("Set light-sensor kvalue is %x %x, gold = (0x%x, 0x%x)\n", ALS_datah,ALS_datal, ALS_goldh, ALS_goldl);
+		I("Set light-sensor kvalue is (0x%x, 0x%x), gold = (0x%x, 0x%x)"
+		  "\n", ALS_datah, ALS_datal, ALS_goldh, ALS_goldl);
+
+		cmp_data[0] = ALS_goldl;
+		cmp_data[1] = ALS_goldh;
+		cmp_data[2] = ALS_datal;
+		cmp_data[3] = ALS_datah;
+
+		if (CWMCU_Get_Calibrator(CW_LIGHT, data) >= 0) {
+			I("%s: Re-read lightsensor kvalues = (0x%x, 0x%x,"
+			  " 0x%x, 0x%x)\n", __func__, data[0], data[1],
+			  data[2], data[3]);
+			for (i = 0; i < 4; i++) {
+				if (data[i] != cmp_data[i]) {
+					I(
+					  "%s: Found diff, i = %d, data = 0x%x,"
+					  " cmp_data = 0x%x\n", __func__,
+					  i, data[i], cmp_data[i]);
+					  break;
+				}
+			}
+			if (i < 4) {
+				u8 one_to_four[4] = {1, 2, 3, 4};
+
+				for (j = 0; j < 4; j++) {
+					CWMCU_i2c_write(sensor,
+						CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,
+						&one_to_four[j], 1);
+				}
+
+				CWMCU_Get_Calibrator(CW_LIGHT, data);
+				for (j = 0; j < 4; j++) {
+					if (data[j] == 4) {
+						I(
+						  "%s: Found '4', j = %d\n",
+						  __func__, j);
+						j++;
+						break;
+					}
+				}
+
+				
+				for (; j < 4; j++) {
+					CWMCU_i2c_write(sensor,
+						CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,
+						&cmp_data[j], 1);
+				}
+
+				
+				for (j = 0; j < 4; j++) {
+					CWMCU_i2c_write(sensor,
+						CW_I2C_REG_SENSORS_CALIBRATOR_SET_DATA_LIGHT,
+						&cmp_data[j], 1);
+				}
+			} else {
+				I("%s: lightsensor kvalues matched\n",
+				  __func__);
+			}
+		}
 	}
 
 	if(((sensor->ps_kheader & (0x50 << 24)) == (0x50 << 24)) && ((sensor->ps_kheader & (0x53 << 16)) == (0x53 << 16))){
@@ -1283,7 +1248,7 @@ int touch_status(u8 status){
 
     if(status == 1 || status == 0){
         ret = CWMCU_i2c_write(mcu_data, TOUCH_STATUS_REGISTER, &status, 1);
-        //D("[TP][SensorHub] touch_status = %d\n", status);
+        D("[TP][SensorHub] touch_status = %d\n", status);
     }
     return ret;
 }
@@ -1316,7 +1281,7 @@ static int active_set(struct device *dev,struct device_attribute *attr,const cha
 	}
 
  	sscanf(buf, "%d %d\n",&sensors_id, &enabled);
-	//I("%s++: sensors_id = %d, enabled = %d\n", __func__, sensors_id, enabled);
+	I("%s++: sensors_id = %d, enabled = %d\n", __func__, sensors_id, enabled);
 	if (probe_i2c_fail) {
 		I("%s++: probe_i2c_fail retrun 0\n", __func__);
 		return 0;
@@ -1325,11 +1290,6 @@ static int active_set(struct device *dev,struct device_attribute *attr,const cha
 		I("%s: Any_Motion && power_key_pressed\n", __func__);
 		return count;
 	}
-
-	if ((sensors_id == Proximity) && (enabled == 0) && proximity_flag) {
-		enabled = 1;
-	}
-
 	if ((sensors_id == Proximity) && (enabled == 0)) {
 		if (mcu_data->proximity_debu_info == 1) {
 			uint8_t mcu_data_p[4];
@@ -1383,7 +1343,7 @@ static int active_set(struct device *dev,struct device_attribute *attr,const cha
 	    (sensors_id < CW_SENSORS_ID_END) &&
 	    (sensors_id >= 0)
 	   ) {
-		//I("%s: Filter first ZEROs, sensors_id = 0x%x\n", __func__, sensors_id);
+		I("%s: Filter first ZEROs, sensors_id = 0x%x\n", __func__, sensors_id);
 		mcu_data->filter_first_zeros[sensors_id] = 1;
 	}
 
@@ -1449,8 +1409,8 @@ static int active_set(struct device *dev,struct device_attribute *attr,const cha
 		I("%s: Report dummy -1 proximity event\n", __func__);
 	}
 
-	//I("%s--: sensors_id = %d, enable = %d, enable_list = 0x%x\n",
-	//	__func__, sensors_id, enabled, mcu_data->enabled_list);
+	I("%s--: sensors_id = %d, enable = %d, enable_list = 0x%x\n",
+		__func__, sensors_id, enabled, mcu_data->enabled_list);
 
 	return count;
 }
@@ -1545,10 +1505,10 @@ static int interval_set(struct device *dev, struct device_attribute *attr, const
 		break;
 	default:
 		reg_addr = 0;
-		/*I("%s: Only reoprt_period changed, sensors_id = %d,"
+		I("%s: Only reoprt_period changed, sensors_id = %d,"
 			" delay_us = %6d\n",
 			__func__, sensors_id,
-			mcu_data->report_period[sensors_id]);*/
+			mcu_data->report_period[sensors_id]);
 		return count;
 	}
 	switch (val) {
@@ -1571,14 +1531,14 @@ static int interval_set(struct device *dev, struct device_attribute *attr, const
 		return count;
 	}
 
-	//D("%s: reg_addr = 0x%x, reg_value = 0x%x\n",
-	//		__func__, reg_addr, reg_value);
+	D("%s: reg_addr = 0x%x, reg_value = 0x%x\n",
+			__func__, reg_addr, reg_value);
 	rc = CWMCU_i2c_write(mcu_data, reg_addr, &reg_value, 1);
 	if (rc)
 		E("%s: CWMCU_i2c_write fails, rc = %d\n", __func__, rc);
 
-        //I("%s: sensors_id = %d, delay_us = %6d\n",
-	//	__func__, sensors_id, mcu_data->report_period[sensors_id]);
+        I("%s: sensors_id = %d, delay_us = %6d\n",
+		__func__, sensors_id, mcu_data->report_period[sensors_id]);
 
 	return count;
 }
@@ -1670,21 +1630,12 @@ static struct attribute_group sysfs_attribute_group = {
 	.attrs = sysfs_attributes
 };
 #endif
-
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-extern void sweep2wake_setdev(struct input_dev * input_device);
-#endif
-
 static void __devinit CWMCU_init_input_device(struct CWMCU_data *sensor,struct input_dev *idev)	
 {
 	idev->name = CWMCU_I2C_NAME;
 	
 	idev->id.bustype = BUS_I2C;
 	idev->dev.parent = &sensor->client->dev;
-
-#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_WAKE_GESTURES
-	sweep2wake_setdev(idev);
-#endif
 
 	idev->evbit[0] = BIT_MASK(EV_ABS);
 	set_bit(EV_ABS, idev->evbit);
@@ -2720,7 +2671,7 @@ static void cwmcu_irq_work_func(struct work_struct *work)
 	u8 INT_st1 = 0, INT_st2 = 0, INT_st3 = 0, INT_st4 = 0, ERR_st = 0;
 	u8 clear_intr = 0xFF;
 	u16 light_adc[1]={0};
-	//D("[CWMCU] %s\n",__func__);
+	D("[CWMCU] %s\n",__func__);
 	
 
 	if(sensor->input == NULL ) {
@@ -2743,8 +2694,8 @@ static void cwmcu_irq_work_func(struct work_struct *work)
 	CWMCU_i2c_read(sensor, CWSTM32_ERR_ST, data, 1);
 	ERR_st = data[0];
 
-        //D("%s: INT_st(1, 2, 3, 4, 5) = (0x%x, 0x%x, 0x%x, 0x%x, 0x%x)\n",
-        //        __func__, INT_st1, INT_st2, INT_st3, INT_st4, ERR_st);
+        D("%s: INT_st(1, 2, 3, 4, 5) = (0x%x, 0x%x, 0x%x, 0x%x, 0x%x)\n",
+                __func__, INT_st1, INT_st2, INT_st3, INT_st4, ERR_st);
 	
 	if (INT_st1 & CW_MCU_INT_BIT_PROXIMITY) {
 		if(sensor->enabled_list & (1<<Proximity)){
@@ -2792,7 +2743,7 @@ static void cwmcu_irq_work_func(struct work_struct *work)
 					input_report_abs(sensor->input, ABS_MISC, data[0]);
 				input_sync(sensor->input);
 
-				//D("Light interrupt occur value is %d, adc is %x ls_calibration is %d\n",data[0],light_adc[0],sensor->ls_calibrated);
+				D("Light interrupt occur value is %d, adc is %x ls_calibration is %d\n",data[0],light_adc[0],sensor->ls_calibrated);
 			} else {
 				D("Light interrupt occur value is %d, adc is %x ls_calibration is %d (message only)\n",
 				  data[0],light_adc[0],sensor->ls_calibrated);
@@ -3533,20 +3484,20 @@ static int fb_notifier_callback(struct notifier_block *self,
         struct fb_event *evdata = data;
         int *blank;
 
-        //D("%s\n", __func__);
+        D("%s\n", __func__);
         if (evdata && evdata->data && event == FB_EVENT_BLANK && mcu_data &&
                         mcu_data->client) {
                 blank = evdata->data;
                 switch (*blank) {
                 case FB_BLANK_UNBLANK:
-			//D("MCU late_resume\n");
+			D("MCU late_resume\n");
 			mcu_data->input_polled->poll_interval = 10;
                         break;
                 case FB_BLANK_POWERDOWN:
                 case FB_BLANK_HSYNC_SUSPEND:
                 case FB_BLANK_VSYNC_SUSPEND:
                 case FB_BLANK_NORMAL:
-			//D("MCU early_suspend\n");
+			D("MCU early_suspend\n");
 			mcu_data->input_polled->poll_interval = 200;
                         break;
                 }
